@@ -1,0 +1,262 @@
+---
+title: "ORLA_Exercise3"
+author: "Tianyu Xu & Ada Xu"
+date: "2026-10-31"
+output: html_document
+---
+
+# Question 1: Please replicate the code and markdown provided in the readings for the mtcars dataset to visualize it using hierarchical cluster analysis heatmaps following the recommendations from the readings, including using uncentered correlation.
+```{r}
+library(devtools)
+#install_github("jokergoo/ComplexHeatmap")
+#install_github("cran/hopach")
+#install.packages("circlize")
+
+```
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("hopach", update = FALSE, ask = FALSE)
+```
+
+
+
+## load packages
+
+
+```{r cars}
+library(ComplexHeatmap)
+library(circlize)
+library(hopach)
+```
+## read the dataset
+
+
+```{r}
+head(mtcars)
+```
+```{r}
+data<-mtcars[, c(1:7)]
+```
+
+## rescale the dataset
+
+
+```{r}
+data.scale<-scale(data)
+head(data.scale)
+```
+## heatmap 1
+
+
+```{r}
+Heatmap(data.scale, name = "mtcars heatmap", 
+        cluster_rows=FALSE , cluster_columns = FALSE)
+```
+
+## cluster on rows
+```{r}
+Heatmap(data.scale, name = "mtcars heatmap", 
+        cluster_columns = FALSE)
+```
+
+# cluster on rows and columns
+
+
+```{r}
+Heatmap(data.scale, name = "mtcars heatmap")
+```
+
+## clustering using uncentered correlation and average linkage
+
+
+```{r}
+uncenter.dist<-function(m) {
+  as.dist(as.matrix(distancematrix(m, d="cosangle")))
+}
+```
+
+```{r}
+row.clus<-hclust(uncenter.dist(data.scale), method = "ave")
+col.clus<-hclust(uncenter.dist(t(data.scale)), method = "ave")
+
+Heatmap(data.scale, name = "mtcars heatmap", 
+        cluster_rows=row.clus, cluster_columns=col.clus)
+```
+
+## dichotomous variables
+
+```{r}
+ht_inline<-Heatmap(mtcars[, c(8)], name = "Cylinder Config",
+                   col = colorRamp2(c(0,1),c("white", "black")),
+                   heatmap_legend_param = list(at = c(0,1),
+                         labels = c("V-shaped", "Inline")),
+                   width = unit(0.5,"cm"))
+
+ht_manual<-Heatmap(mtcars[, c(9)], name = "Transmission",
+                   col = colorRamp2(c(0,1),c("white", "black")),
+                   heatmap_legend_param = list(at = c(0,1),
+                         labels = c("Automatic", "Manual")),
+                   width = unit(0.5,"cm"))
+```
+
+```{r}
+ht_main = Heatmap(data.scale, name = "cluster rows",
+                  cluster_rows=row.clus, cluster_columns = col.clus)
+
+draw(ht_main+ht_manual+ht_inline, auto_adjust = FALSE) 
+```
+```{r}
+draw(ht_main+ht_manual+ht_inline) 
+```
+
+# Question 2: Select at least three different options/alternatives from ComplexHeatmap's first three chapters, and apply them to the mtcars dataset. For example, such as using different clustering algorithms (k-means, etc.), separation of heatmaps, stacking, different ways to annotate (columns and rows and different graphing options beyond black/white blocks), etc. Please provide some text in your markdown discussing what options/alternatives you selected, why this was interesting, and any challenges you experienced with running the visualizations. Provide a few sentences to interpret each new heatmap visualization.
+
+## Approach 1
+### what options selected, why this was interesting, any challenges, interpret each visualization
+To make the clusters easier to distinguish, we split the heatmap into two labeled slices using Gestalt principles of proximity and visual grouping, while reducing the font size and tuning the margins to prevent car names from overlapping after setting auto_adjust = FALSE. Also, the title of the heatmap is added. The visualization reveals two distinct vehicle profiles: the "Fuel Efficient" cluster features high gas mileage (mpg), lighter weight (wt), and lower horsepower (hp) with smaller engine displacement, predominantly paired with manual transmissions and straight (in-line) engines; conversely, the "Fuel Inefficient" cluster consists of heavier, high-horsepower vehicles with lower mpg and larger engines, which are mostly equipped with automatic transmissions and V-shaped engines.
+
+
+```{r}
+library(grid)
+ht_main = Heatmap(data.scale, name = "cluster rows",
+                  cluster_rows=row.clus, cluster_columns = col.clus,
+                  row_split = 2, 
+                  row_title = c("fuel efficient", "fuel inefficient"),
+                  row_title_rot = 0,
+                  row_names_gp = gpar(fontsize = 6),     
+                  column_names_gp = gpar(fontsize = 9),  
+                  row_title_gp = gpar(fontsize = 10))
+
+draw(ht_main+ht_manual+ht_inline, auto_adjust = FALSE,
+     column_title = "Hierarchical Clustering Analysis of mtcars Dataset",
+     column_title_gp = gpar(fontsize = 12, fontface = "bold")) 
+```
+
+## Approach 2
+Following Approach 1, the top boxplot annotation illustrates the distribution of column values across all 32 car models. Also, the title for the heatmap is added. The median line for each metric (hp, wt, cyl, disp, qsec, mpg, and drat) hovers near 0, with values spanning roughly between -2 and +2, confirming our prior standardization process (Z-score scaling). Additionally, mpg and drat exhibit longer upper whiskers and higher extreme values, highlighting the presence of notable high-end outliers in fuel efficiency and rear-axle gear ratios within the dataset.
+
+```{r}
+anno <- HeatmapAnnotation(
+  Distribution = anno_boxplot(
+    data.scale,
+    height = unit(2, "cm"),
+    gp = gpar(fill = "#e0e0e0"),
+    box_width = 0.9,
+    outline = FALSE
+  ),
+  annotation_name_side = "left",
+  annotation_name_gp = gpar(fontsize = 9)
+)
+
+ht_main = Heatmap(data.scale, name = "cluster rows",
+                  top_annotation = anno,
+                  cluster_rows=row.clus, cluster_columns = col.clus,
+                  row_split = 2, 
+                  row_title = c("fuel efficient", "fuel inefficient"),
+                  row_title_rot = 0,
+                  row_names_gp = gpar(fontsize = 6),     
+                  column_names_gp = gpar(fontsize = 9),  
+                  row_title_gp = gpar(fontsize = 10))
+draw(ht_main+ht_manual+ht_inline, auto_adjust = FALSE,
+     column_title = "Hierarchical Clustering Analysis of mtcars Dataset",
+     column_title_gp = gpar(fontsize = 12, fontface = "bold")) 
+```
+
+
+## Approach 3
+In Approach 3, we implemented k-means clustering by manually defining the cluster count k, in contrast to hierarchical clustering, which partitions data by slicing an existing tree topology via branch cuts (row_split and column_split). Also, the title of the plot is added. Interestingly, while both methods cleanly separated performance and engine metrics (hp, wt, cyl, disp) from efficiency and transmission metrics (mpg, drat, qsec), the cluster index assignment reversed between them: hierarchical clustering grouped the engine power metrics into Cluster 1 and the fuel efficiency metrics into Cluster 2, whereas k-means designated the fuel efficiency metrics as Cluster 1 and the engine power metrics as Cluster 2 due to the arbitrary nature of initial centroid labeling.
+
+
+```{r}
+ht_main = Heatmap(data.scale, name = "cluster rows",
+                  row_km = 2, row_km_repeats = 100,
+                  column_km = 2, column_km_repeats = 100,
+                  row_title = c("fuel efficient", "fuel inefficient"),
+                  row_names_gp = gpar(fontsize = 6),     
+                  column_names_gp = gpar(fontsize = 9),  
+                  row_title_gp = gpar(fontsize = 10))
+
+draw(ht_main+ht_manual+ht_inline, auto_adjust = FALSE,
+     column_title = "K-Means Clustering Analysis (2 Clusters)",
+     column_title_gp = gpar(fontsize = 14, fontface = "bold")) 
+```
+
+# 3. Research Proposal
+
+A Hierarchical Cluster Analysis of AI-Supported Learning in Higher Education
+
+1. What is the purpose of your study?
+
+This study identifies profiles of university students’ perceived experiences with generative AI-supported learning, in which examines how perceived AI benefits occur alongside teacher responsibility, collaboration with fellow students, and psychological well-being. For instance, one student may report strong benefits from AI yet little peer exchange; another may report moderate AI benefits within a supportive, collaborative course. Describing these configurations using the hierarchical cluster analysis (HCA) heatmap helps educators examine the social context of AI-supported learning without reducing learning to grades.
+
+2. Is there any research literature and theory that supports this argument? How so?
+
+Self-determination theory suggests that learning environments supporting competence, autonomy, and relatedness can shape engagement and well-being (Ryan & Deci, 2020). It provides a rationale for examining AI-supported learning in relation to human support. Supportive relationships can also benefit well-being generally and buffer the harmful effects of stressful experiences when the available support matches a person’s needs (Cohen & Wills, 1985). Applied to education, teacher guidance and peer feedback may provide practical help, reassurance, and a sense of belonging. In a study of 364 university language learners using a GenAI chatbot, Li and Chiu (2025) found that perceived teacher support and need satisfaction were related to several forms of engagement. A separate higher-education study examined teacher responsibility, AI integration, peer collaboration, and well-being together (Li et al., 2025), where their model linked teacher responsibility to well-being indirectly through AI integration, with this indirect association stronger when peer collaboration was higher. These studies explain why the four dimensions belong in the same study, but their variable-centered analyses summarize relationships across students. An average positive association cannot tell us whether some students report strong AI benefits with little peer collaboration while others report the reverse. The gap here is a person-level account of how these experiences occur together, and whether any groups differ in their balance of AI benefit and human support rather than only in their general tendency to agree.
+There are also some existing studies used the HCA heatmap method. Lee et al. (2016) used hierarchical clustering and heatmaps to reveal different university students’ Canvas activity patterns, where their measures were LMS traces instead of survey perceptions. Reverter et al. (2020) applied hierarchical clustering with heatmaps to student course and teaching evaluations, while their cluster is based on evaluation questions. When exploring the AI topic, Saihi and Ahmed (2026) clustered higher-education users’ survey responses into distinct GenAI-chatbot adoption personas using hierarchical clustering followed by k-means. Together, these studies support using a student-level clustergram to examine whether perceived AI benefit, teacher responsibility, peer collaboration, and well-being form meaningful profiles.
+
+3. Why use cluster analysis heatmaps?
+
+Hierarchical clustering groups students with similar patterns across the 32 survey items without assuming the number of groups in advance. The heatmap displays students as rows, ordered by a dendrogram, and the individual items as columns grouped under teacher-responsibility (TR), AI-supported learning-effectiveness (ASLE), fellow-student-collaboration (FSC), and psychological-well-being (SPW). A fixed diverging color scale shows each original five-point response: dark blue for strongly disagree (1), a neutral color for neither agree nor disagree (3), and dark red for strongly agree (5). The figure therefore shows both student clusters and the item-level answers that characterize them. ComplexHeatmap in R provides the clustered heatmap and construct labels; the full matrix is exported at high resolution, with enlarged excerpts for print. The colors encode responses, while the dendrogram reflects similarity calculated separately from those responses.
+
+4. What are the research questions?
+
+The study addresses the following questions:
+RQ1: To what extent do university students exhibit distinct profiles across perceived AI-supported learning effectiveness, teacher responsibility, and fellow-student collaboration?
+RQ2: To what extent do the psychological well-being and identified profiles differ in the balance of perceived AI benefit and human support?
+
+5. What dataset is needed, and is one available?
+
+This study requires linked, respondent-level answers to all four constructs. Nguyen’s (2026) open survey of 1,558 university students in Vietnam provides a feasible dataset. Its deposited spreadsheet contains 32 five-point items: 13 TR items, four ASLE items, four FSC items, and 11 SPW items, plus five demographic variables (gender, type of university, year of study, major, duration of generative AI use). The cross-sectional survey measures perceptions at one time point. It does not measure actual learning gains or change over time, but it supports an exploratory visualization of response patterns.
+6. What data and variables does the study examine?
+
+The study retains each student’s responses to all 32 items. ASLE1–ASLE4 cover perceived learning effectiveness, outcomes or grades, benefits relative to working alone, and academic skills; these are perceptions, not recorded grades. The 13 TR items address teacher responsibility, four FSC items address exchanging ideas, coordinating tasks, discussion, and feedback, and 11 SPW items address psychological well-being. Each heatmap cell shows the original 1-5 Likert scale response. After checking coding and scale reliability, the study summarizes the 11 SPW items as a mean well-being score and displays it as a separate row annotation with its own legend. The similarity calculation weights the four constructs equally so that TR do not dominate merely because they have more items. Demographics and duration of regular AI use appear as separate annotations or describe the resulting clusters after their coding is checked; they do not determine cluster membership.
+
+7. What clustering equation and approach does the study use?
+
+The study organizes the data as a matrix with one student per row and 21 TR, ASLE, and FSC items as columns. Before clustering, it adjusts the item blocks, so teacher responsibility and well-being do not count more simply because they contain more questions. It then compares each pair of students using uncentered Pearson correlation across their responses. In general terms, student dissimilarity equals 1 minus that correlation. Agglomerative hierarchical clustering then begins with each student separately and uses average linkage. The distance between two clusters is the average dissimilarity across all pairs of students in those clusters. The two closest clusters merge at each step, producing a dendrogram. In R, ComplexHeatmap (Gu et al., 2016) displays that dendrogram alongside the original 1-5 score answers, colored from blue (strongly disagree) to red (strongly agree), with columns grouped by construct. A weighted Euclidean sensitivity analysis repeats the clustering with average linkage and the same construct weights, so that it can. This checks whether broad profiles change when similarity reflects absolute response levels as well as patterns. SPW remains excluded from both clustering analyses. The study compares SPW distributions across the resulting profiles, using the annotation to visualize these comparisons. Because uncentered correlation emphasizes the pattern of answers instead of overall agreement level, the study also checks whether the broad clusters change when a distance that preserves response levels is used.
+
+8. What might the study find?
+
+The study may find differences in the balance among perceived AI benefit, teacher support, peer collaboration, and well-being. For example, some students may report stronger AI benefits than peer collaboration, while others show the opposite pattern. Uncentered correlation can primarily detect relative response patterns, so students whose ratings differ only in overall level may cluster together. The weighted Euclidean sensitivity analysis shows whether a high-versus-low response pattern also matters. If the clusters mainly reflect a general tendency to agree, the study can report that as limitation instead of claiming distinct educational experiences.
+
+9. Why does this matter for education?
+The analysis shows whether students’ perceived AI benefits coexist with supportive teaching, peer collaboration, and well-being, or whether these experiences appear unevenly. With such profiles provided, it can inform the design of AI-supported activities that include teacher guidance and meaningful peer feedback. Since findings remain exploratory, we cannot establish that AI causes better learning or well-being, or assign individuals to fixed categories. Later research can add observed AI-use practices, longitudinal data, and performance evidence to test the educational meaning of these profiles.
+
+References
+
+Cohen, S., & Wills, T. A. (1985). Stress, social support, and the buffering hypothesis. Psychological Bulletin, 98(2), 310–357. https://doi.org/10.1037/0033-2909.98.2.310
+Gu, Z., Eils, R., & Schlesner, M. (2016). Complex heatmaps reveal patterns and correlations in multidimensional genomic data. Bioinformatics, 32(18), 2847–2849. https://doi.org/10.1093/bioinformatics/btw313
+Lee, J. E., Recker, M., Bowers, A. J., & Yuan, M. (2016). Hierarchical cluster analysis heatmaps and pattern analysis: An approach for visualizing learning management system interaction data. In Proceedings of the 9th International Conference on Educational Data Mining (pp. 603–604). https://files.eric.ed.gov/fulltext/ED592609.pdf
+Li, H., Zhang, J., Khan, W. A., & Lamsali, H. (2025). Teacher responsibility, AI integration, and student well-being: The role of peer collaboration in higher education. Acta Psychologica, 260, 105532. https://doi.org/10.1016/j.actpsy.2025.105532
+Li, Y., & Chiu, T. K. F. (2025). The mediating effects of needs satisfaction on the relationship between teacher support and student engagement with generative artificial intelligence (GenAI) chatbots from a self-determination theory (SDT) perspective. Education and Information Technologies, 30, 20051–20070. https://doi.org/10.1007/s10639-025-13574-w
+Nguyen, X. (2026). Data on teacher responsibility, generative AI-supported learning effectiveness, fellow student collaboration, and students’ psychological well-being in higher education [Data set, Version 2]. Mendeley Data. https://doi.org/10.17632/zvdf6893rk.2
+Reverter, A., Martinez, C., Currey, P., van Bommel, S., & Hudson, N. J. (2020). Unravelling student evaluations of courses and teachers. Cogent Education, 7(1), 1771830. https://doi.org/10.1080/2331186X.2020.1771830
+Ryan, R. M., & Deci, E. L. (2020). Intrinsic and extrinsic motivation from a self-determination theory perspective: Definitions, theory, practices, and future directions. Contemporary Educational Psychology, 61, 101860. https://doi.org/10.1016/j.cedpsych.2020.101860
+Saihi, A., & Ahmed, V. (2026). Uncovering adoption personas for generative AI in higher education: A clustering-based segmentation approach. International Journal of Educational Technology in Higher Education, 23, 7. https://doi.org/10.1186/s41239-026-00583-z
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
