@@ -1,0 +1,800 @@
+---
+title: "Midterm1109"
+author: "Tianyu Xu"
+date: "2026-11-09"
+output: html_document
+---
+
+
+# load student survey
+```{r}
+library(haven)
+library(dplyr)
+
+student <- read_sav(
+  "/Users/xutianyu/Downloads/PISA2025/CY09_MS_STU_PUF.sav", 
+  encoding = "latin1"
+)
+
+```
+
+# extract the variables for this study
+
+```{r}
+agency <- student %>%
+  select(
+    CNT,
+    MALE,
+    OECD,
+    PV1MATH, PV1SCIE,
+    ST432Q02DA, ST432Q03DA, ST432Q04DA, ST432Q06DA,
+    ST433Q01DA, ST433Q02DA, ST433Q04DA, ST433Q06DA
+  )
+```
+
+# rename the variables
+```{r}
+agency <- agency %>%
+  rename(
+    country = CNT,
+    male = MALE,
+    math_score = PV1MATH,
+    science_score = PV1SCIE,
+    
+    plan_study    = ST432Q02DA,
+    identify_gaps = ST432Q03DA,
+    self_question = ST432Q04DA,
+    adapt_strategy = ST432Q06DA,
+    
+    ask_classmates   = ST433Q01DA,
+    ask_teachers     = ST433Q02DA,
+    ask_general      = ST433Q04DA,
+    ask_after_trying = ST433Q06DA
+  )
+```
+
+
+```{r}
+ncol(agency)
+```
+
+# find NA proportion
+```{r}
+
+library(tibble)
+
+agency_na_prop <- agency %>%
+  group_by(country) %>%
+  summarise(across(where(is.numeric), ~ mean(is.na(.x))))
+
+#View(agency_na_prop)
+```
+
+
+# use NA proportion = 0.5 as a threshold, make a table for all the countries
+```{r}
+
+high_na_vars_per_country <- agency_na_prop %>%
+  mutate(across(-country, ~ .x > 0.5)) %>%     
+  mutate(Variables_Over_50pct_NA = rowSums(select(., -country))) %>% 
+  select(country, Variables_Over_50pct_NA)           
+
+#View(high_na_vars_per_country)
+print(as_tibble(high_na_vars_per_country), n = Inf)
+```
+
+# make a table for countries NA proportion > 0.5
+
+```{r}
+countries_with_high_na <- high_na_vars_per_country %>%
+  filter(Variables_Over_50pct_NA > 0)
+
+print(as_tibble(countries_with_high_na), n = Inf)
+```
+
+# look into exact variables over the 0.5 threshold
+
+```{r}
+
+agency_prop <- agency %>%
+  group_by(country) %>%
+  summarise(across(where(is.numeric), ~ mean(is.na(.x))))
+
+
+t(agency_prop %>% filter(country == "ARM"))
+t(agency_prop %>% filter(country == "KHM"))
+t(agency_prop %>% filter(country == "LBN"))
+t(agency_prop %>% filter(country == "MUS"))
+t(agency_prop %>% filter(country == "QKI"))
+t(agency_prop %>% filter(country == "QTJ"))
+t(agency_prop %>% filter(country == "RWA"))
+t(agency_prop %>% filter(country == "ZMB"))
+```
+
+
+```{r}
+t(agency_prop %>% filter(country == "USA"))
+t(agency_prop %>% filter(country == "UZB"))
+```
+# change the threshold to 0.55
+```{r}
+
+library(tibble)
+
+agency_na_prop1 <- agency %>%
+  group_by(country) %>%
+  summarise(across(where(is.numeric), ~ mean(is.na(.x))))
+
+
+high_na_vars_per_country1 <- agency_na_prop1 %>%
+  mutate(across(-country, ~ .x > 0.55)) %>%     
+  mutate(Variables_Over_55pct_NA1 = rowSums(select(., -country))) %>% 
+  select(country, Variables_Over_55pct_NA1)           
+
+#View(high_na_vars_per_country)
+print(as_tibble(high_na_vars_per_country1), n = Inf)
+```
+
+# make a table for countries NA proportion > 0.55
+```{r}
+countries_with_high_na1 <- high_na_vars_per_country1 %>%
+  filter(Variables_Over_55pct_NA1 > 0)
+
+print(as_tibble(countries_with_high_na1), n = Inf)
+```
+
+```{r}
+t(agency_prop %>% filter(country == "ARM"))
+t(agency_prop %>% filter(country == "KHM"))
+t(agency_prop %>% filter(country == "LBN"))
+t(agency_prop %>% filter(country == "MUS"))
+t(agency_prop %>% filter(country == "QKI"))
+t(agency_prop %>% filter(country == "QTJ"))
+t(agency_prop %>% filter(country == "RWA"))
+t(agency_prop %>% filter(country == "ZMB"))
+t(agency_prop %>% filter(country == "UZB"))
+
+```
+
+
+# delete rows about these countries
+```{r}
+countries_to_exclude <- c("ARM", "KHM", "LBN", "MUS", "QKI", "QTJ", "RWA", "ZMB", "UZB")
+
+agency1 <- agency %>%
+  filter(!country %in% countries_to_exclude)
+```
+
+
+# now no NA proportion over the threshold of 0.5
+
+```{r}
+agency_na_prop2 <- agency1 %>%
+  group_by(country) %>%
+  summarise(across(where(is.numeric), ~ mean(is.na(.x))))
+
+#View(agency_na_prop1)
+```
+
+
+# now overall, 81 countries
+```{r}
+high_na_vars_per_country2 <- agency_na_prop2 %>%
+  mutate(across(-country, ~ .x > 0.55)) %>%     
+  mutate(Variables_Over_55pct_NA2 = rowSums(select(., -country))) %>% 
+  select(country, Variables_Over_55pct_NA2)           
+
+#View(high_na_vars_per_country1)
+print(as_tibble(high_na_vars_per_country2), n = Inf)
+```
+
+# now delete rows with cells with missing values
+
+```{r}
+agency1 <- na.omit(agency1)
+anyNA(agency1) 
+```
+
+```{r}
+glimpse(agency1)
+```
+# summary statistics table
+
+# numeric variables
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+numeric_table <- agency1 %>%
+  select(male, math_score, science_score) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  group_by(Variable) %>%
+  summarise(
+    Mean   = round(mean(Value, na.rm = TRUE), 2),
+    Median = round(median(Value, na.rm = TRUE), 2),
+    SD     = round(sd(Value, na.rm = TRUE), 2),
+    Min    = round(min(Value, na.rm = TRUE), 2),
+    Max    = round(max(Value, na.rm = TRUE), 2)
+  )
+
+print(numeric_table)
+write.csv(numeric_table, "~/Downloads/numeric_summary_statistics.csv", row.names = FALSE)
+```
+# categorical variables-> treat as numeric variables
+
+```{r}
+
+agency1 <- agency1 %>%
+  mutate(across(c(plan_study, identify_gaps, self_question, adapt_strategy,
+                  ask_classmates, ask_teachers, ask_general, ask_after_trying), 
+                as.numeric))
+
+
+numeric_summary_table <- agency1 %>%
+  select(plan_study, identify_gaps, self_question, adapt_strategy,
+         ask_classmates, ask_teachers, ask_general, ask_after_trying) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  group_by(Variable) %>%
+  summarise(
+    Mean   = round(mean(Value, na.rm = TRUE), 2),
+    Median = round(median(Value, na.rm = TRUE), 2),
+    SD     = round(sd(Value, na.rm = TRUE), 2),
+    Min    = round(min(Value, na.rm = TRUE), 2),
+    Max    = round(max(Value, na.rm = TRUE), 2)
+  )
+
+print(numeric_summary_table, n = Inf)
+
+write.csv(numeric_summary_table, "~/Downloads/numeric_summary_statistics_agency.csv", row.names = FALSE)
+```
+```{r}
+nrow(agency1)
+```
+
+
+
+
+
+
+
+# EDA
+## percieved agency for goal setting and help seeking: Lollipop plot
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 1. Calculate country-level mean index for your 8 variables
+country_means <- agency1 %>%
+  group_by(country) %>% 
+  summarise(
+    plan_study       = mean(plan_study, na.rm = TRUE),
+    identify_gaps    = mean(identify_gaps, na.rm = TRUE),
+    self_question    = mean(self_question, na.rm = TRUE),
+    adapt_strategy   = mean(adapt_strategy, na.rm = TRUE),
+    ask_classmates   = mean(ask_classmates, na.rm = TRUE),
+    ask_teachers     = mean(ask_teachers, na.rm = TRUE),
+    ask_general      = mean(ask_general, na.rm = TRUE),
+    ask_after_trying = mean(ask_after_trying, na.rm = TRUE)
+  )
+
+# 2. Pivot to long format
+long_means <- country_means %>%
+  pivot_longer(
+    cols = -country, 
+    names_to = "Variable", 
+    values_to = "Mean_Value"
+  )
+
+# 3. Find the lowest and highest country for each variable
+extremes <- long_means %>%
+  group_by(Variable) %>%
+  filter(Mean_Value == max(Mean_Value, na.rm = TRUE) | 
+         Mean_Value == min(Mean_Value, na.rm = TRUE)) %>%
+  mutate(Type = if_else(Mean_Value == max(Mean_Value, na.rm = TRUE), "Highest", "Lowest"))
+
+# Order variables nicely on the x-axis
+var_levels <- c("plan_study", "identify_gaps", "self_question", "adapt_strategy",
+                "ask_classmates", "ask_teachers", "ask_general", "ask_after_trying")
+long_means$Variable <- factor(long_means$Variable, levels = var_levels)
+extremes$Variable <- factor(extremes$Variable, levels = var_levels)
+
+# Define baseline reference (e.g., 0)
+baseline_val <- 0
+
+# 4. Create the PISA-style vertical lollipop plot
+p <- ggplot() +
+  # Light vertical stems for ALL countries (group = country is required for discrete x axes)
+  geom_segment(data = long_means, 
+               aes(x = Variable, xend = Variable, y = baseline_val, yend = Mean_Value, group = country), 
+               color = "grey75", linewidth = 0.4, alpha = 0.4) +
+  
+  # Highlight lines for the Min and Max extremes
+  geom_segment(data = extremes, 
+               aes(x = Variable, xend = Variable, y = baseline_val, yend = Mean_Value, group = country), 
+               color = "#2b83ba", linewidth = 0.8) +
+  
+  # Baseline reference markers at y = 0
+  geom_point(data = data.frame(Variable = factor(var_levels, levels = var_levels)), 
+             aes(x = Variable, y = baseline_val), 
+             color = "#1f78b4", shape = 18, size = 4) +
+  
+  # Points for extreme countries
+  geom_point(data = extremes, 
+             aes(x = Variable, y = Mean_Value, color = Type), 
+             shape = 15, size = 3) +
+  
+  # Country text labels next to the extreme points
+  geom_text(data = extremes, 
+            aes(x = Variable, y = Mean_Value, label = country, color = Type), 
+            hjust = -0.15, vjust = 0.5, size = 3, show.legend = FALSE) +
+  
+  scale_color_manual(values = c("Highest" = "#d7191c", "Lowest" = "#2b83ba")) +
+  
+  # Let ggplot auto-scale with padding so labels don't get cut off on the sides/top
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  
+  labs(
+    title = "Self-Regulated Learning & Help-Seeking: Perceived Agency Indices",
+    subtitle = "Diamonds represent baseline (0); squares represent lowest and highest countries.",
+    x = NULL,
+    y = "Mean index",
+    color = "Country Extremes"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 25, hjust = 1, face = "bold", size = 9),
+    axis.text.y = element_text(size = 9),
+    axis.line.y = element_line(color = "black"),
+    legend.position = "bottom"
+  )
+
+# 5. Save to PNG
+ggsave(filename = "~/Downloads/pisa_style_vertical_plot.png", plot = p, width = 12, height = 7, dpi = 300)
+```
+
+## updated lollipop
+
+```{r}
+# install.packages("ggh4x")
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggh4x) # Required for nested/grouped x-axis labels
+
+# 1. Calculate country-level mean index for your 8 variables
+country_means <- agency1 %>%
+  group_by(country) %>% 
+  summarise(
+    plan_study       = mean(plan_study, na.rm = TRUE),
+    identify_gaps    = mean(identify_gaps, na.rm = TRUE),
+    self_question    = mean(self_question, na.rm = TRUE),
+    adapt_strategy   = mean(adapt_strategy, na.rm = TRUE),
+    ask_classmates   = mean(ask_classmates, na.rm = TRUE),
+    ask_teachers     = mean(ask_teachers, na.rm = TRUE),
+    ask_general      = mean(ask_general, na.rm = TRUE),
+    ask_after_trying = mean(ask_after_trying, na.rm = TRUE)
+  )
+
+# 2. Pivot to long format
+long_means <- country_means %>%
+  pivot_longer(
+    cols = -country, 
+    names_to = "Variable", 
+    values_to = "Mean_Value"
+  )
+
+# 3. Find the lowest and highest country for each variable
+extremes <- long_means %>%
+  group_by(Variable) %>%
+  filter(Mean_Value == max(Mean_Value, na.rm = TRUE) | 
+         Mean_Value == min(Mean_Value, na.rm = TRUE)) %>%
+  mutate(Type = if_else(Mean_Value == max(Mean_Value, na.rm = TRUE), "Highest", "Lowest"))
+
+# Order variables and assign grouping interaction for nested x-axis labels
+var_levels <- c("plan_study", "identify_gaps", "self_question", "adapt_strategy",
+                "ask_classmates", "ask_teachers", "ask_general", "ask_after_trying")
+
+long_means$Variable <- factor(long_means$Variable, levels = var_levels)
+extremes$Variable <- factor(extremes$Variable, levels = var_levels)
+
+# Create a interaction data frame for nested grouping (Goal Setting vs Help Seeking)
+# ggh4x looks for interaction terms or structured factor levels like Group_Variable
+add_groups <- function(df) {
+  df %>%
+    mutate(
+      Category = if_else(as.character(Variable) %in% c("plan_study", "identify_gaps", "self_question", "adapt_strategy"), 
+                         "Goal Setting", "Help Seeking"),
+      # Format as interaction so ggh4x nests them cleanly
+      Var_Nested = interaction(Category, Variable, sep = "_._")
+    )
+}
+
+# Apply grouping to our datasets
+long_means <- add_groups(long_means)
+extremes <- add_groups(extremes)
+
+nested_var_levels <- interaction(
+  c(rep("Goal Setting", 4), rep("Help Seeking", 4)),
+  var_levels,
+  sep = "_._"
+)
+
+long_means$Var_Nested <- factor(long_means$Var_Nested, levels = nested_var_levels)
+extremes$Var_Nested <- factor(extremes$Var_Nested, levels = nested_var_levels)
+
+# Define baseline reference (e.g., 0)
+baseline_val <- 0
+
+# 4. Create the PISA-style vertical lollipop plot with nested x-axis
+p <- ggplot() +
+  # Light vertical stems for ALL countries
+  geom_segment(data = long_means, 
+               aes(x = Var_Nested, xend = Var_Nested, y = baseline_val, yend = Mean_Value, group = country), 
+               color = "grey75", linewidth = 0.4, alpha = 0.4) +
+  
+  # Highlight lines for the Min and Max extremes
+  geom_segment(data = extremes, 
+               aes(x = Var_Nested, xend = Var_Nested, y = baseline_val, yend = Mean_Value, group = country), 
+               color = "#2b83ba", linewidth = 0.8) +
+  
+  # Baseline reference markers at y = 0
+  geom_point(data = data.frame(Var_Nested = factor(nested_var_levels, levels = nested_var_levels)), 
+             aes(x = Var_Nested, y = baseline_val), 
+             color = "#1f78b4", shape = 18, size = 4) +
+  
+  # Points for extreme countries
+  geom_point(data = extremes, 
+             aes(x = Var_Nested, y = Mean_Value, color = Type), 
+             shape = 15, size = 3) +
+  
+  # Country text labels next to the extreme points
+  geom_text(data = extremes, 
+            aes(x = Var_Nested, y = Mean_Value, label = country, color = Type), 
+            hjust = -0.15, vjust = 0.5, size = 3, show.legend = FALSE) +
+  
+  scale_color_manual(values = c("Highest" = "#d7191c", "Lowest" = "#2b83ba")) +
+  
+  # Use ggh4x to create nested axis labels separating Goal Setting and Help Seeking
+  scale_x_discrete(
+    labels = function(x) sub(".*_\\._", "", x), # Strip prefix for bottom labels
+    guide = "axis_nested"
+  ) +
+  
+  # Let ggplot auto-scale with padding
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  
+  labs(
+    title = "Self-Regulated Learning & Help-Seeking: Perceived Agency Indices",
+    subtitle = "Diamonds represent baseline (0); squares represent lowest and highest countries.",
+    x = NULL,
+    y = "Mean index",
+    color = "Country Extremes"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 25, hjust = 1, face = "bold", size = 8.5),
+    ggh4x.axis.nestline = element_line(color = "black", linewidth = 0.5),
+    ggh4x.axis.nesttext = element_text(face = "bold", size = 10, color = "#1f78b4"),
+    axis.text.y = element_text(size = 9),
+    axis.line.y = element_line(color = "black"),
+    legend.position = "bottom"
+  )
+
+# 5. Save to PNG
+ggsave(filename = "~/Downloads/pisa_style_vertical_plot.png", plot = p, width = 12, height = 7, dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+
+## Help seeking: Diverging Stacked Bar Charts
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 1. Select the help-seeking variables
+help_vars <- c("ask_classmates", "ask_teachers", "ask_general", "ask_after_trying")
+
+# 2. Reshape and calculate overall proportions for each category
+overall_props <- agency1 %>%
+  select(all_of(help_vars)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Response") %>%
+  filter(!is.na(Response)) %>%
+  count(Variable, Response) %>%
+  group_by(Variable) %>%
+  mutate(
+    Prop = n / sum(n),
+    Percentage = Prop * 100
+  ) %>%
+  ungroup() %>%
+  mutate(Response = factor(Response))
+
+# 3. Create a single combined Diverging Stacked Bar Chart
+p <- ggplot(overall_props, aes(x = Variable, y = Prop, fill = Response)) +
+  geom_col(position = "stack", width = 0.6) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_fill_brewer(palette = "RdBu", name = "Response\nCategory") +
+  labs(
+    title = "Overall Distribution of Help-Seeking Likert Responses",
+    subtitle = "Aggregated across all respondents in the dataset",
+    x = NULL,
+    y = "Proportion"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold", size = 11),
+    axis.text.y = element_text(face = "bold", size = 10),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+
+# 4. Save the plot to PNG
+ggsave(filename = "~/Downloads/overall_help_seeking_bars.png", plot = p, width = 10, height = 6, dpi = 300)
+```
+
+
+# goal setting
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# 1. Select the goal-setting / self-regulated learning variables
+goal_vars <- c("plan_study", "identify_gaps", "self_question", "adapt_strategy")
+
+# 2. Reshape and calculate overall proportions for each category
+overall_goal_props <- agency1 %>%
+  select(all_of(goal_vars)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Response") %>%
+  filter(!is.na(Response)) %>%
+  count(Variable, Response) %>%
+  group_by(Variable) %>%
+  mutate(
+    Prop = n / sum(n),
+    Percentage = Prop * 100
+  ) %>%
+  ungroup() %>%
+  mutate(Response = factor(Response))
+
+# 3. Create a single combined Stacked Bar Chart
+p <- ggplot(overall_goal_props, aes(x = Variable, y = Prop, fill = Response)) +
+  geom_col(position = "stack", width = 0.6) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_fill_brewer(palette = "RdBu", name = "Response\nCategory") +
+  labs(
+    title = "Overall Distribution of Self-Regulated Learning Likert Responses",
+    subtitle = "Aggregated across all respondents in the dataset",
+    x = NULL,
+    y = "Proportion"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold", size = 11),
+    axis.text.y = element_text(face = "bold", size = 10),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+
+# 4. Save the plot to PNG
+ggsave(filename = "~/Downloads/overall_goal_setting_bars.png", plot = p, width = 10, height = 6, dpi = 300)
+```
+
+
+## scatterplot of math and science score
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggrepel) # Recommended for non-overlapping country labels
+
+# 1. Calculate country-level mean scores for math and science
+country_scores <- agency1 %>%
+  group_by(country) %>%
+  summarise(
+    math_score    = mean(math_score, na.rm = TRUE),
+    science_score = mean(science_score, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(math_score) & !is.na(science_score))
+
+# 2. Create the scatterplot with country labels
+p <- ggplot(country_scores, aes(x = math_score, y = science_score, label = country)) +
+  geom_point(color = "#1f78b4", size = 2.5, shape = 18) +
+  # Use geom_text_repel so country labels don't overlap with each other
+  geom_text_repel(size = 3, box.padding = 0.3, point.padding = 0.3, max.overlaps = Inf) +
+  labs(
+    title = "Country-Level Mean Performance in Math and Science",
+    x = "Mean Math Score",
+    y = "Mean Science Score"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(size = 9),
+    plot.title = element_text(face = "bold", size = 12)
+  )
+
+# Print plot to console
+print(p)
+
+# 3. Save the plot to PNG
+ggsave(filename = "~/Downloads/country_math_science_scatter.png", plot = p, width = 10, height = 7, dpi = 300)
+```
+
+
+
+# HCA Heatmaps
+## load the package
+
+```{r}
+library(devtools)
+library(ComplexHeatmap)
+library(circlize)
+library(hopach)
+```
+
+# scale the df dataset
+```{r}
+# data <- agency1[, c(-1)]
+# data.scale<-scale(data)
+# head(data.scale)
+```
+
+
+# HCA heatmaps: uncentered correlation + average linkage
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("hopach", update = FALSE, ask = FALSE)
+```
+
+
+```{r}
+
+# choose variables to create the heatmap
+selected_vars <- c("plan_study", "identify_gaps", "self_question", "adapt_strategy", 
+                   "ask_classmates", "ask_teachers", "ask_general", "ask_after_trying")
+
+country_data <- agency1 %>%
+  group_by(country) %>%
+  summarise(
+    across(all_of(selected_vars), ~ mean(.x, na.rm = TRUE)),
+    # male = mean(male, na.rm = TRUE),           
+    math_score = mean(math_score, na.rm = TRUE),     
+    science_score = mean(science_score, na.rm = TRUE)      
+  )
+
+# change into full country names
+country_names_map <- c(
+  "AUT" = "Austria", "CHE" = "Switzerland", "GRC" = "Greece", "LTU" = "Lithuania",
+  "BGR" = "Bulgaria", "LVA" = "Latvia", "DEU" = "Germany", "ITA" = "Italy",
+  "BEL" = "Belgium", "CZE" = "Czech Republic", "IRL" = "Ireland", "FRA" = "France",
+  "NLD" = "Netherlands", "HUN" = "Hungary", "POL" = "Poland", "SVK" = "Slovak Republic",
+  "GBR" = "United Kingdom", "LUX" = "Luxembourg", "SVN" = "Slovenia", "ISR" = "Israel",
+  "FIN" = "Finland", "EST" = "Estonia", "AUS" = "Australia", "NZL" = "New Zealand",
+  "KOR" = "Korea", "URY" = "Uruguay", "SLV" = "El Salvador", "MAC" = "Macao",
+  "HKG" = "Hong Kong", "DOM" = "Dominican Republic", "TUR" = "Turkey", "DNK" = "Denmark",
+  "JPN" = "Japan", "BRA" = "Brazil", "NOR" = "Norway", "JOR" = "Jordan",
+  "KGZ" = "Kyrgyzstan", "MDA" = "Moldova", "GEO" = "Georgia", "PER" = "Peru",
+  "AZE" = "Azerbaijan", "MLT" = "Malta", "HRV" = "Croatia", "SRB" = "Serbia",
+  "ROU" = "Romania", "MKD" = "North Macedonia", "MNE" = "Montenegro", "QAT" = "Qatar",
+  "ARE" = "United Arab Emirates", "ALB" = "Albania", "SAU" = "Saudi Arabia",
+  "IDN" = "Indonesia", "VNM" = "Vietnam", "PHL" = "Philippines", "THA" = "Thailand",
+  "KAZ" = "Kazakhstan", "KEN" = "Kenya", "KSV" = "Kosovo", "MAR" = "Morocco",
+  "PSE" = "Palestine", "ESP" = "Spain", "CHL" = "Chile", "CAN" = "Canada",
+  "SWE" = "Sweden", "ARG" = "Argentina", "PRT" = "Portugal", "PRY" = "Paraguay",
+  "MNG" = "Mongolia", "CRI" = "Costa Rica", "MYS" = "Malaysia", "BRN" = "Brunei",
+  "SGP" = "Singapore", "MEX" = "Mexico", "GTM" = "Guatemala", "COL" = "Colombia",
+  "ECU" = "Ecuador", "ISL" = "Iceland", "USA" = "United States"
+)
+
+country_data$Country_Name <- unname(country_names_map[country_data$country])
+country_data$Country_Name[is.na(country_data$Country_Name)] <- country_data$country[is.na(country_data$Country_Name)]
+
+# scale the dataset
+data_matrix <- as.matrix(country_data %>% select(all_of(selected_vars)))
+rownames(data_matrix) <- country_data$Country_Name
+data.scale.subset <- scale(data_matrix)
+
+# distance measures
+uncenter.dist <- function(m) {
+  as.dist(as.matrix(hopach::distancematrix(m, d = "cosangle")))
+}
+
+row.clus <- tryCatch({
+  hclust(uncenter.dist(data.scale.subset), method = "ave")
+}, error = function(e) {
+  hclust(dist(data.scale.subset), method = "ave")
+})
+
+col.clus <- tryCatch({
+  hclust(uncenter.dist(t(data.scale.subset)), method = "ave")
+}, error = function(e) {
+  hclust(dist(t(data.scale.subset)), method = "ave")
+})
+
+# rightside annotation
+right_anno <- rowAnnotation(
+  # Male_Prop = country_data$male,
+  Math = country_data$math_score,
+  Science = country_data$science_score,
+  col = list(
+    #Male_Prop = colorRamp2(c(min(country_data$male, na.rm = TRUE), 
+                            # mean(country_data$male, na.rm = TRUE),
+                            # max(country_data$male, na.rm = TRUE)), 
+                          #  c("#ffffcc", "#ffbb78", "#d95f0e")),
+    Math = colorRamp2(c(min(country_data$math_score, na.rm = TRUE), 
+                        mean(country_data$math_score, na.rm = TRUE), 
+                        max(country_data$math_score, na.rm = TRUE)), 
+                      c("#edf8e5", "#a1d99b", "#238b45")),
+    Science = colorRamp2(c(min(country_data$science_score, na.rm = TRUE), 
+                           mean(country_data$science_score, na.rm = TRUE), 
+                           max(country_data$science_score, na.rm = TRUE)), 
+                         c("#f7fbff", "#a6bddb", "#2b8cbe"))
+  ),
+  simple_anno_size = unit(0.35, "cm"),
+  annotation_name_gp = gpar(fontsize = 8)
+)
+
+
+png("~/Downloads/agency_heatmap.png", width = 12, height = 12, units = "in", res = 300)
+Heatmap(
+  data.scale.subset, 
+  name = "agency heatmap", 
+  cluster_rows = row.clus,        
+  cluster_columns = col.clus,     
+  row_split = 4,
+  column_split = 2,
+  top_annotation = HeatmapAnnotation(
+    foo = anno_block(
+      gp = gpar(fill = c("#E41A1C", "#377EB8")),
+      labels = c("Goal Setting", "Help Seeking"), 
+      labels_gp = gpar(col = "white", fontsize = 10)
+    )
+  ),
+  left_annotation = rowAnnotation(
+    foo = anno_block(
+      gp = gpar(fill = 2:5),
+      labels = c("Low Goal / High Help", "Low Goal / Low Help", "Moderate Goal / Moderate Help", "High Goal / Low Help"), 
+      labels_gp = gpar(col = "white", fontsize = 8)
+    )
+  ),
+  right_annotation = right_anno,
+  show_row_names = TRUE,          
+  row_names_side = "right",       
+  row_names_gp = gpar(fontsize = 7),     
+  column_names_gp = gpar(fontsize = 9),  
+  column_title = "Hierarchical Clustering Analysis of perceived agency PISA 2025",
+  column_title_gp = gpar(fontsize = 12, fontface = "bold")
+)
+```
+
+
+
+
+
+
+
+
+
